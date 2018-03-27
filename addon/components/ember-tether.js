@@ -14,7 +14,7 @@ export default Component.extend({
   constraints: null,
   optimizations: null,
   emberTetherConfig: computed(function() {
-    return (getOwner(this).resolveRegistration('config:environment') || {})['ember-tether'];
+    return getOwner(this).resolveRegistration('config:environment')['ember-tether'];
   }),
   bodyElement: computed(function() {
     let config = get(this, 'emberTetherConfig');
@@ -22,27 +22,6 @@ export default Component.extend({
       return document.getElementById(config.bodyElementId);
     }
   }),
-  attributeBindings: [
-    'aria-atomic',
-    'aria-busy',
-    'aria-controls',
-    'aria-current',
-    'aria-describedby',
-    'aria-details',
-    'aria-disabled',
-    'aria-errormessage',
-    'aria-flowto',
-    'aria-haspopup',
-    'aria-hidden',
-    'aria-invalid',
-    'aria-keyshortcuts',
-    'aria-label',
-    'aria-labelledby',
-    'aria-live',
-    'aria-owns',
-    'aria-relevant',
-    'aria-roledescription'
-  ],
   didInsertElement() {
     this._super(...arguments);
     this.addTether();
@@ -50,11 +29,9 @@ export default Component.extend({
 
   willDestroyElement() {
     this._super(...arguments);
-    let { _tether, element } = this;
-    run.schedule('render', () => {
-      this.removeElement(element);
-      this.removeTether(_tether);
-    });
+    const { _tether, element } = this;
+    this.removeTether(_tether);
+    this.moveElementBackIntoParent(element);
   },
 
   didRender() {
@@ -86,6 +63,12 @@ export default Component.extend({
 
   addTether() {
     if (get(this, '_tetherTarget')) {
+      // Tether moves our element in the DOM. This
+      // causes Glimmer 2 to be very, very confused.
+      // So, we save the original parent which we'll
+      // append the element to after we remove tether in
+      // removeElement
+      this._originalParentNode = this.element.parentNode;
       this._tether = new Tether(this._tetherOptions());
     }
   },
@@ -96,10 +79,14 @@ export default Component.extend({
     }
   },
 
-  removeElement(element) {
+  moveElementBackIntoParent(element) {
+    // Remove the element from the body
     if (element.parentNode) {
       element.parentNode.removeChild(element);
     }
+    // For Glimmer 2 to work properly, we need to
+    // to readd the element to the original parent
+    this._originalParentNode.appendChild(element);
   },
 
   _tetherTarget: computed('target', function() {
